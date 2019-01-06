@@ -1,3 +1,5 @@
+
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Condition;
@@ -6,46 +8,86 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class Concurrent {
 
+    Lock lock = new ReentrantLock();
+    Condition condition = lock.newCondition();
+    Semaphore semaphore = new Semaphore(3);
+
     public void lock() {
-        Lock lock = new ReentrantLock();
         lock.lock();
         try {
-            System.out.println("hello world");
+            System.out.println("locked");
+            Thread.sleep(15_000);
+
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         } finally {
             lock.unlock();
+            System.out.println("unlocked");
         }
     }
 
     public void condition() throws InterruptedException {
-        Lock lock = new ReentrantLock();
-        Condition condition = lock.newCondition();
-        // do something
+        System.out.println("Get lock");
+        lock.lock();
+        System.out.println("Release lock for 10 seconds");
+        System.out.println(LocalTime.now());
         condition.await(10, TimeUnit.SECONDS);
-        System.out.println("Get result.");
+        System.out.println(LocalTime.now());
+        System.out.println("Get lock again.");
     }
 
-    public void executorService() {
+    public void executorService() throws InterruptedException {
         ExecutorService executorService = Executors.newFixedThreadPool(3);
-        executorService.submit(new Runnable() {
-            @Override
-            public void run() {
-                System.out.println("Task is running.");
+        executorService.submit(() -> {
+            System.out.println("Task2 is running.");
+            try {
+                condition();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         });
+        executorService.submit(() -> {
+            System.out.println("Task1 is running.");
+            lock();
+        });
+        executorService.shutdown();
+        executorService.awaitTermination(16, TimeUnit.SECONDS);
+        System.out.println("is terminated? " + executorService.isTerminated());
     }
 
-    public void blockingDeque() {
-        Queue<Integer> blockingDeque = new ArrayBlockingQueue<>(20);
+    public void semaphore() {
+        try {
+            semaphore.acquire();
+            System.out.println(Thread.currentThread().getName() + " is working");
+            Thread.sleep(10_000);
+            semaphore.release();
+            System.out.println(Thread.currentThread().getName() + " is over");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void executorServiceSemaphore() {
+        ExecutorService executorService = Executors.newFixedThreadPool(5);
+        for (int i = 0; i < 5; i++)
+            executorService.submit(() -> {
+                semaphore();
+            });
+        executorService.shutdown();
+    }
+
+    public void blockingQueue() {
+        Queue<Integer> blockingQueue = new ArrayBlockingQueue<>(20);
         Queue<Integer> queue = new ArrayDeque<>();
-        blockingDeque.add(1);
-        blockingDeque.add(2);
-        blockingDeque.add(3);
+        blockingQueue.add(1);
+        blockingQueue.add(2);
+        blockingQueue.add(3);
         queue.offer(1);
         queue.offer(2);
         queue.offer(3);
 
-        blockingDeque.peek();
-        queue.peek();
+        System.out.println(blockingQueue.peek());
+        System.out.println(queue.peek());
     }
 
     public void concurrentHashMap() {
@@ -54,6 +96,8 @@ public class Concurrent {
         concurrentHashMap.put("World", 2);
 
         System.out.println(concurrentHashMap.get("Hello"));
+        System.out.println(concurrentHashMap.get("World"));
+        System.out.println(concurrentHashMap.get("None"));
     }
 
     public void copyOnWriteList() {
@@ -65,19 +109,13 @@ public class Concurrent {
         System.out.println(copyOnWriteList.size());
     }
 
-    public void semaphore() {
-        Semaphore semaphore = new Semaphore(3);
-        try {
-            semaphore.acquire();
-            System.out.println(Thread.currentThread().getName() + " is working");
-            Thread.sleep(1000);
-            semaphore.release();
-            System.out.println(Thread.currentThread().getName() + " is over");
-        } catch (InterruptedException e) {
-        }
-    }
+    public static void main(String[] args) throws InterruptedException {
+        Concurrent concurrent = new Concurrent();
 
-    public static void main(String[] args) {
-        new Concurrent().copyOnWriteList();
+        /*concurrent.concurrentHashMap();
+        concurrent.blockingQueue();
+        concurrent.copyOnWriteList();
+        concurrent.executorService();*/
+        concurrent.executorServiceSemaphore();
     }
 }
